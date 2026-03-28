@@ -1,3 +1,4 @@
+
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -6,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppContext } from '../../context/AppContext';
 import api from '../../lib/api';
 import { getStoredJson, setStoredJson } from '../../lib/storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type Relato = {
   id: number;
@@ -26,6 +28,30 @@ export default function RelatosScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [favoritos, setFavoritos] = useState<Relato[]>([]);
+
+  async function carregarFavoritos() {
+    const dados = await AsyncStorage.getItem("favoritos");
+    if (dados) {
+      setFavoritos(JSON.parse(dados));
+    }
+  }
+
+  async function toggleFavorito(relato: Relato) {
+    let novosFavoritos;
+    const jaExiste = favoritos.find((item) => item.id === relato.id);
+
+    if (jaExiste) {
+      novosFavoritos = favoritos.filter((item) => item.id !== relato.id);
+    } else {
+      novosFavoritos = [...favoritos, relato];
+    }
+
+    setFavoritos(novosFavoritos);
+    await AsyncStorage.setItem("favoritos", JSON.stringify(novosFavoritos));
+  }
+
 
   const loadRelato = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
     try {
@@ -59,6 +85,15 @@ export default function RelatosScreen() {
     if (!dailyTaskCompleted) return;
     loadRelato();
   }, [dailyTaskCompleted, loadRelato]);
+
+  useEffect(() => {
+    carregarFavoritos();
+  }, []);
+
+
+  const ehFavorito = relato
+    ? favoritos.some((item) => item.id === relato.id)
+    : false;
 
   if (!dailyTaskCompleted) {
     return (
@@ -107,16 +142,32 @@ export default function RelatosScreen() {
 
         {!loading && !error && !relato && (
           <View className="mt-4 rounded-md border border-orange-300/40 bg-orange-500/20 p-4">
-            <Text className="text-sm text-orange-100">Nenhum relato disponivel no momento. Puxe para atualizar quando houver conexao.</Text>
+            <Text className="text-sm text-orange-100">Nenhum relato disponivel no momento.</Text>
           </View>
         )}
 
         {!loading && !error && relato && (
           <View className="mt-4 overflow-hidden rounded-md border border-[#314466] bg-[#0E1A33] p-4">
+            
+            {/* HEADER COM FAVORITO */}
             <View className="flex-row items-center justify-between">
               <Text className="text-xs font-bold uppercase tracking-wide text-cyan-300">Destaque de hoje</Text>
-              <View className="rounded-md bg-orange-500/30 px-2 py-1">
-                <Text className="text-xs font-semibold text-orange-100">{getReadingTime(relato.conteudo)} min</Text>
+
+              <View className="flex-row items-center gap-3">
+                <View className="rounded-md bg-orange-500/30 px-2 py-1">
+                  <Text className="text-xs font-semibold text-orange-100">
+                    {getReadingTime(relato.conteudo)} min
+                  </Text>
+                </View>
+
+                {/* ⭐ BOTÃO FAVORITO */}
+                <Pressable onPress={() => toggleFavorito(relato)}>
+                  <Ionicons
+                    name={ehFavorito ? "star" : "star-outline"}
+                    size={22}
+                    color="#F4B400"
+                  />
+                </Pressable>
               </View>
             </View>
 
@@ -129,3 +180,4 @@ export default function RelatosScreen() {
     </SafeAreaView>
   );
 }
+
